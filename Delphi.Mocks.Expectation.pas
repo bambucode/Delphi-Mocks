@@ -31,7 +31,9 @@ interface
 uses
   Rtti,
   Delphi.Mocks,
-  Delphi.Mocks.Interfaces;
+  Delphi.Mocks.ParamMatcher,
+  Delphi.Mocks.Interfaces,
+  Delphi.Mocks.Utils;
 
 
 //disable warnings about c++ compatibility, since we don't intend to support it.
@@ -49,43 +51,47 @@ type
     FTimes                  : Cardinal;
     FHitCount               : Cardinal;
     FMethodName             : string;
+    FMatchers                : TArray<IMatcher>;
   protected
     function GetExpectationType : TExpectationType;
     function GetExpectationMet : boolean;
     function Match(const Args : TArray<TValue>) : boolean;
     procedure RecordHit;
+    procedure CheckExpectationMet;
     function Report : string;
     function ArgsToString : string;
     procedure CopyArgs(const Args: TArray<TValue>);
     constructor Create(const AMethodName : string);
-    constructor CreateWhen(const AMethodName : string; const Args: TArray<TValue>);
+    constructor CreateWhen(const AMethodName : string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
   public
-    constructor CreateOnceWhen(const AMethodName : string; const Args : TArray<TValue>);
+    constructor CreateOnceWhen(const AMethodName : string; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateOnce(const AMethodName : string);
 
-    constructor CreateNeverWhen(const AMethodName : string; const Args : TArray<TValue>);
+    constructor CreateNeverWhen(const AMethodName : string; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateNever(const AMethodName : string);
 
-    constructor CreateAtLeastOnceWhen(const AMethodName : string; const Args : TArray<TValue>);
+    constructor CreateAtLeastOnceWhen(const AMethodName : string; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateAtLeastOnce(const AMethodName : string);
 
-    constructor CreateAtLeastWhen(const AMethodName : string; const times : Cardinal; const Args : TArray<TValue>);
+    constructor CreateAtLeastWhen(const AMethodName : string; const times : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateAtLeast(const AMethodName : string; const times : Cardinal);
 
-    constructor CreateAtMostWhen(const AMethodName : string; const times : Cardinal; const Args : TArray<TValue>);
+    constructor CreateAtMostWhen(const AMethodName : string; const times : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateAtMost(const AMethodName : string; const times : Cardinal);
 
-    constructor CreateBetweenWhen(const AMethodName : string; const a,b : Cardinal; const Args : TArray<TValue>);
+    constructor CreateBetweenWhen(const AMethodName : string; const a,b : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateBetween(const AMethodName : string; const a,b : Cardinal);
 
-    constructor CreateExactlyWhen(const AMethodName : string; const times : Cardinal; const Args : TArray<TValue>);
+    constructor CreateExactlyWhen(const AMethodName : string; const times : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateExactly(const AMethodName : string; const times : Cardinal);
 
-    constructor CreateBeforeWhen(const AMethodName : string; const ABeforeMethodName : string ; const Args : TArray<TValue>);
+    constructor CreateBeforeWhen(const AMethodName : string; const ABeforeMethodName : string ; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateBefore(const AMethodName : string; const ABeforeMethodName : string);
 
-    constructor CreateAfterWhen(const AMethodName : string; const AAfterMethodName : string;const Args : TArray<TValue>);
+    constructor CreateAfterWhen(const AMethodName : string; const AAfterMethodName : string;const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     constructor CreateAfter(const AMethodName : string; const AAfterMethodName : string);
+
+    procedure AfterConstruction; override;
   end;
 
 
@@ -97,18 +103,15 @@ uses
 
 { TExpectation }
 
-function TExpectation.ArgsToString: string;
-var
-  i : integer;
+procedure TExpectation.AfterConstruction;
 begin
-  result := '( ';
-  for i := Low(FArgs) to High(FArgs) do
-  begin
-    if i > 0 then
-      result := result + ', ';
-    result := result + FArgs[i].ToString;
-  end;
-  result := result + ' )';
+  inherited;
+  CheckExpectationMet;
+end;
+
+function TExpectation.ArgsToString: string;
+begin
+  Result := Delphi.Mocks.Utils.ArgsToString(FArgs);
 end;
 
 procedure TExpectation.CopyArgs(const Args: TArray<TValue>);
@@ -125,20 +128,21 @@ end;
 
 constructor TExpectation.Create(const AMethodName : string);
 begin
+  SetLength(FMatchers, 0);
+
   FExpectationMet := False;
   FHitCount := 0;
   FMethodName := AMethodName;
 end;
 
-constructor TExpectation.CreateWhen(const AMethodName: string; const Args: TArray<TValue>);
+constructor TExpectation.CreateWhen(const AMethodName: string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
   FExpectationMet := False;
   FHitCount := 0;
   FMethodName := AMethodName;
   CopyArgs(Args);
+  FMatchers := matchers;
 end;
-
-
 
 constructor TExpectation.CreateAfter(const AMethodName : string; const AAfterMethodName: string);
 begin
@@ -147,9 +151,9 @@ begin
   FBeforeAfterMethodName := AAfterMethodName;
 end;
 
-constructor TExpectation.CreateAfterWhen(const AMethodName : string; const AAfterMethodName: string;  const Args: TArray<TValue>);
+constructor TExpectation.CreateAfterWhen(const AMethodName : string; const AAfterMethodName: string;  const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.AfterWhen;
   FBeforeAfterMethodName := AAfterMethodName;
 end;
@@ -168,16 +172,16 @@ begin
   FTimes := 1;
 end;
 
-constructor TExpectation.CreateAtLeastOnceWhen(const AMethodName : string; const Args: TArray<TValue>);
+constructor TExpectation.CreateAtLeastOnceWhen(const AMethodName : string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.AtLeastOnceWhen;
   FTimes := 1;
 end;
 
-constructor TExpectation.CreateAtLeastWhen(const AMethodName : string; const times: Cardinal; const Args: TArray<TValue>);
+constructor TExpectation.CreateAtLeastWhen(const AMethodName : string; const times: Cardinal; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.AtLeastWhen;
   FTimes := times;
 end;
@@ -189,9 +193,9 @@ begin
   FTimes := times;
 end;
 
-constructor TExpectation.CreateAtMostWhen(const AMethodName : string; const times: Cardinal; const Args: TArray<TValue>);
+constructor TExpectation.CreateAtMostWhen(const AMethodName : string; const times: Cardinal; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.AtMostWhen;
   FTimes := times;
 end;
@@ -203,9 +207,9 @@ begin
   FBeforeAfterMethodName  := ABeforeMethodName;
 end;
 
-constructor TExpectation.CreateBeforeWhen(const AMethodName : string; const ABeforeMethodName: string; const Args: TArray<TValue>);
+constructor TExpectation.CreateBeforeWhen(const AMethodName : string; const ABeforeMethodName: string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.BeforeWhen;
   FBeforeAfterMethodName := ABeforeMethodName;
 end;
@@ -218,9 +222,9 @@ begin
   FBetween[1] := b;
 end;
 
-constructor TExpectation.CreateBetweenWhen(const AMethodName : string; const a, b: Cardinal; const Args: TArray<TValue>);
+constructor TExpectation.CreateBetweenWhen(const AMethodName : string; const a, b: Cardinal; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.BetweenWhen;
   FBetween[0] := a;
   FBetween[1] := b;
@@ -233,9 +237,9 @@ begin
   FTimes := times;
 end;
 
-constructor TExpectation.CreateExactlyWhen(const AMethodName : string; const times: Cardinal; const Args: TArray<TValue>);
+constructor TExpectation.CreateExactlyWhen(const AMethodName : string; const times: Cardinal; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.ExactlyWhen;
   FTimes := times;
 end;
@@ -244,14 +248,12 @@ constructor TExpectation.CreateNever(const AMethodName : string) ;
 begin
   Create(AMethodName);
   FExpectationType := TExpectationType.Never;
-  FExpectationMet := True;
 end;
 
-constructor TExpectation.CreateNeverWhen(const AMethodName : string; const Args: TArray<TValue>);
+constructor TExpectation.CreateNeverWhen(const AMethodName : string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.NeverWhen;
-  FExpectationMet := True;
 end;
 
 constructor TExpectation.CreateOnce(const AMethodName : string );
@@ -261,9 +263,9 @@ begin
   FTimes := 1;
 end;
 
-constructor TExpectation.CreateOnceWhen(const AMethodName : string; const Args: TArray<TValue>);
+constructor TExpectation.CreateOnceWhen(const AMethodName : string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 begin
-  CreateWhen(AMethodName,Args);
+  CreateWhen(AMethodName, Args, matchers);
   FExpectationType := TExpectationType.OnceWhen;
   FTimes := 1;
 end;
@@ -295,6 +297,19 @@ function TExpectation.Match(const Args: TArray<TValue>): boolean;
     end;
     result := True;
   end;
+
+  function MatchWithMatchers: Boolean;
+  var
+    i : integer;
+  begin
+    result := False;
+    for i := 0 to High(FMatchers) do
+    begin
+      if not FMatchers[i].Match(Args[i+1]) then
+        exit;
+    end;
+    result := True;
+  end;
 begin
   result := False;
   case FExpectationType of
@@ -318,18 +333,29 @@ begin
     BetweenWhen,
     ExactlyWhen,
     BeforeWhen,
-    AfterWhen: result := MatchArgs;
+    AfterWhen:
+    begin
+      if Length(FMatchers) > 0 then
+        result := MatchWithMatchers
+      else
+        result := MatchArgs;
+    end;
   end;
 end;
 
 procedure TExpectation.RecordHit;
 begin
   Inc(FHitCount);
+  CheckExpectationMet;
+end;
+
+procedure TExpectation.CheckExpectationMet;
+begin
   case FExpectationType of
     Once,
     OnceWhen: FExpectationMet := FHitCount = 1;
     Never,
-    NeverWhen: FExpectationMet := False;
+    NeverWhen: FExpectationMet := FHitCount = 0;
     AtLeastOnce,
     AtLeastOnceWhen: FExpectationMet := FHitCount >= 1;
     AtLeast,
@@ -358,25 +384,25 @@ begin
   if not FExpectationMet then
   begin
      case FExpectationType of
-       Once: result := 'Once';
-       Never: result := 'Never';
+       Once: result := 'Once - Was ' + IntToStr(FHitCount);
+       Never: result := 'Never - Was ' + IntToStr(FHitCount);
        AtLeastOnce: result := 'At Least Once';
-       AtLeast: result := 'At Least ' + IntToStr(FTimes) + ' Times';
-       AtMost: result := 'At Most ' + IntToStr(FTimes) + ' Times';
-       AtMostOnce: result := 'At Most Once';
-       Between: result := 'Between ' + IntToStr(FBetween[0]) + ' and ' + IntToStr(FBetween[1]) + ' Times';
-       Exactly: result := 'Exactly ' + IntToStr(FTimes) + ' Times';
+       AtLeast: result := 'At Least ' + IntToStr(FTimes) + ' Times - Was ' + IntToStr(FHitCount);
+       AtMost: result := 'At Most ' + IntToStr(FTimes) + ' Times - Was ' + IntToStr(FHitCount);
+       AtMostOnce: result := 'At Most Once - Was ' + IntToStr(FHitCount);
+       Between: result := 'Between ' + IntToStr(FBetween[0]) + ' and ' + IntToStr(FBetween[1]) + ' Times - Was ' + IntToStr(FHitCount);
+       Exactly: result := 'Exactly ' + IntToStr(FTimes) + ' Times - Was ' + IntToStr(FHitCount);
        Before: result := 'Before Method : ' + FBeforeAfterMethodName;
        After: result := 'After Method : ' + FBeforeAfterMethodName;
 
-       OnceWhen: result := 'Once When' + ArgsToString;
-       NeverWhen:result := 'Never When' + ArgsToString ;
+       OnceWhen: result := 'Once When' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
+       NeverWhen: result := 'Never When' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
        AtLeastOnceWhen: result := 'At Least Once When' + ArgsToString;
-       AtLeastWhen: result := 'At Least ' + IntToStr(FTimes) + ' Times When ' + ArgsToString;
-       AtMostOnceWhen: result := 'At Most Once When' + ArgsToString;
-       AtMostWhen: result := 'At Most ' + IntToStr(FTimes) + ' Times When ' + ArgsToString;
-       BetweenWhen: result := 'Between ' + IntToStr(FBetween[0]) + ' and ' + IntToStr(FBetween[1]) + ' Times When' + ArgsToString;
-       ExactlyWhen: result := 'Exactly ' + IntToStr(FTimes) + ' Times When' + ArgsToString;
+       AtLeastWhen: result := 'At Least ' + IntToStr(FTimes) + ' Times When ' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
+       AtMostOnceWhen: result := 'At Most Once When' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
+       AtMostWhen: result := 'At Most ' + IntToStr(FTimes) + ' Times When ' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
+       BetweenWhen: result := 'Between ' + IntToStr(FBetween[0]) + ' and ' + IntToStr(FBetween[1]) + ' Times When' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
+       ExactlyWhen: result := 'Exactly ' + IntToStr(FTimes) + ' Times When' + ArgsToString + ' - Was ' + IntToStr(FHitCount);
        BeforeWhen: result := 'Before Method : ' + FBeforeAfterMethodName + ' When ' + ArgsToString;
        AfterWhen: result := 'After Method : ' + FBeforeAfterMethodName + ' When ' + ArgsToString;
      end;

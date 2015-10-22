@@ -59,6 +59,7 @@ type
     function IsUInt64: Boolean;
     function IsVariant: Boolean;
     function IsWord: Boolean;
+	function IsGuid: Boolean;
     function AsDouble: Double;
     function AsFloat: Extended;
     function AsSingle: Single;
@@ -68,6 +69,7 @@ type
 
   TRttiTypeHelper = class helper for TRttiType
     function TryGetMethod(const AName: string; out AMethod: TRttiMethod): Boolean;
+    function FindConstructor : TRttiMethod;
   end;
 
 function CompareValue(const Left, Right: TValue): Integer;
@@ -200,6 +202,10 @@ begin
   if Left.IsVariant and Right.IsVariant then
   begin
     Result := Left.AsVariant = Right.AsVariant;
+  end else
+  if Left.IsGuid and Right.IsGuid then
+  begin
+    Result := IsEqualGuid( Left.AsType<TGUID>, Right.AsType<TGUID> );
   end else
   if Left.TypeInfo = Right.TypeInfo then
   begin
@@ -337,10 +343,29 @@ begin
   Result := TypeInfo = System.TypeInfo(Word);
 end;
 
+function TValueHelper.IsGuid: Boolean;
+begin
+  Result := TypeInfo = System.TypeInfo(TGUID);
+end;
 
 
 
 { TRttiTypeHelper }
+
+function TRttiTypeHelper.FindConstructor: TRttiMethod;
+var
+  candidateCtor: TRttiMethod;
+begin
+  Result := nil;
+  for candidateCtor in GetMethods('Create') do
+  begin
+    if Length(candidateCtor.GetParameters) = 0 then
+    begin
+      Result := candidateCtor;
+      Break;
+    end;
+  end;
+end;
 
 function TRttiTypeHelper.TryGetMethod(const AName: string; out AMethod: TRttiMethod): Boolean;
 begin

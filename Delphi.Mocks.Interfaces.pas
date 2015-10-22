@@ -29,8 +29,10 @@ interface
 
 uses
   SysUtils,
+  TypInfo,
   Generics.Collections,
   Delphi.Mocks,
+  Delphi.Mocks.ParamMatcher,
   Rtti;
 
 type
@@ -84,30 +86,30 @@ type
 
     //behaviors
     procedure WillReturnDefault(const returnValue : TValue);
-    procedure WillReturnWhen(const Args: TArray<TValue>; const returnValue : TValue);
+    procedure WillReturnWhen(const Args: TArray<TValue>; const returnValue : TValue; const matchers : TArray<IMatcher>);
     procedure WillRaiseAlways(const exceptionClass : ExceptClass; const message : string);
-    procedure WillRaiseWhen(const exceptionClass : ExceptClass; const message : string; const Args: TArray<TValue>);
+    procedure WillRaiseWhen(const exceptionClass : ExceptClass; const message : string; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure WillExecute(const func : TExecuteFunc);
-    procedure WillExecuteWhen(const func : TExecuteFunc; const Args: TArray<TValue>);
+    procedure WillExecuteWhen(const func : TExecuteFunc; const Args: TArray<TValue>; const matchers : TArray<IMatcher>);
 
     //expectations
-    procedure OnceWhen(const Args : TArray<TValue>);
+    procedure OnceWhen(const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure Once;
-    procedure NeverWhen(const Args : TArray<TValue>);
+    procedure NeverWhen(const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure Never;
-    procedure AtLeastOnceWhen(const Args : TArray<TValue>);
+    procedure AtLeastOnceWhen(const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure AtLeastOnce;
-    procedure AtLeastWhen(const times : Cardinal; const Args : TArray<TValue>);
+    procedure AtLeastWhen(const times : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure AtLeast(const times : Cardinal);
-    procedure AtMostWhen(const times : Cardinal; const Args : TArray<TValue>);
+    procedure AtMostWhen(const times : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure AtMost(const times : Cardinal);
-    procedure BetweenWhen(const a,b : Cardinal; const Args : TArray<TValue>);
+    procedure BetweenWhen(const a,b : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure Between(const a,b : Cardinal);
-    procedure ExactlyWhen(const times : Cardinal; const Args : TArray<TValue>);
+    procedure ExactlyWhen(const times : Cardinal; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure Exactly(const times : Cardinal);
-    procedure BeforeWhen(const ABeforeMethodName : string ; const Args : TArray<TValue>);
+    procedure BeforeWhen(const ABeforeMethodName : string ; const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure Before(const ABeforeMethodName : string);
-    procedure AfterWhen(const AAfterMethodName : string;const Args : TArray<TValue>);
+    procedure AfterWhen(const AAfterMethodName : string;const Args : TArray<TValue>; const matchers : TArray<IMatcher>);
     procedure After(const AAfterMethodName : string);
 
     //Verification
@@ -117,6 +119,7 @@ type
   IVerify = interface
   ['{58C05610-4BDA-451E-9D61-17C6376C3B3F}']
     procedure Verify(const message : string = '');
+    procedure VerifyAll(const message : string = '');
     function CheckExpectations: string;
   end;
 
